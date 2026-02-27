@@ -1,4 +1,4 @@
-// Commands.h
+п»ї// Commands.h
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
@@ -9,15 +9,17 @@ typedef enum {
     right
 } Direction;
 
-// Макросы для скриптов
-#define SCRIPT_BEGIN() void execute_script() { 
-#define SCRIPT_END() } 
+//#define SCRIPT_BEGIN() void execute_script() {
+//#define SCRIPT_END() } 
 
-void move(Direction dir); 
+void move(Direction dir);
+void droneto(int y, int x);
 void plant();
 void harvest();
 int whattype();
-void ResetPosition();
+int getwidthofgarden();
+int getheightofgarden();
+void resetposition();
 void wait(int milliseconds);
 //void set_speed(int speed);
 

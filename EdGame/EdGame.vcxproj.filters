@@ -32,11 +32,11 @@
     <ClCompile Include="EdGame.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="Commands.h">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="MyScript.cpp">
       <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="Commands.h">
+      <Filter>Файлы заголовков</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

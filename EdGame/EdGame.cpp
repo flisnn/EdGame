@@ -9,14 +9,15 @@
 #include <Windows.h>
 #include <stdbool.h>
 
-extern void execute_script(void);
-
 #define MAX_LOADSTRING 100
 
-// Глобальные переменные:
-HINSTANCE hInst;                                // текущий экземпляр
-WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки заголовка
-WCHAR szWindowClass[MAX_LOADSTRING];            // имя класса главного окна
+bool app_closing = false;
+HINSTANCE hInst;
+WCHAR szTitle[MAX_LOADSTRING];
+WCHAR szWindowClass[MAX_LOADSTRING];
+
+// Объявление функции из скрипта
+extern void execute_script(void);
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -25,9 +26,9 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
@@ -40,7 +41,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     MyRegisterClass(hInstance);
 
     // Выполнить инициализацию приложения:
-    if (!InitInstance (hInstance, nCmdShow))
+    if (!InitInstance(hInstance, nCmdShow))
     {
         return FALSE;
     }
@@ -59,7 +60,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
     }
 
-    return (int) msg.wParam;
+    return (int)msg.wParam;
 }
 
 
@@ -75,17 +76,17 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_EDGAME));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_EDGAME);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_EDGAME));
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_EDGAME);
+    wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
     return RegisterClassExW(&wcex);
 }
@@ -101,8 +102,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        создается и выводится главное окно программы.
 //
 
-const int widthgarden = 10;
-const int heightgarden = 10;
+const int widthgarden = 5;
+const int heightgarden = 5;
 
 const int widthbed = 100;
 const int heightbed = 100;
@@ -116,7 +117,7 @@ struct Drone {
     int y;
 };
 
-struct Drone drone = {0, 0};
+struct Drone drone = { 0, 0 };
 
 HBRUSH hwhiteBrush;
 HBRUSH hyellowBrush;
@@ -172,7 +173,6 @@ void drawgarden(HDC hdc) {
 }
 
 int move_delay = 500;
-bool app_closing = false;
 
 bool wait_with_check(int milliseconds) {
     DWORD start = GetTickCount();
@@ -199,19 +199,19 @@ bool wait_with_check(int milliseconds) {
 void move(Direction dir) {
     switch (dir) {
     case up:
-        if (drone.y > 0) drone.y--; else 
+        if (drone.y > 0) drone.y--; else
             MessageBox(NULL, L"Не могу двигаться вверх - граница поля!", L"Предупреждение", MB_OK | MB_ICONWARNING);
         break;
     case down:
-        if (drone.y < heightgarden - 1) drone.y++; else 
+        if (drone.y < heightgarden - 1) drone.y++; else
             MessageBox(NULL, L"Не могу двигаться вниз - граница поля!", L"Предупреждение", MB_OK | MB_ICONWARNING);
         break;
     case left:
-        if (drone.x > 0) drone.x--; else 
+        if (drone.x > 0) drone.x--; else
             MessageBox(NULL, L"Не могу двигаться влево - граница поля!", L"Предупреждение", MB_OK | MB_ICONWARNING);
         break;
     case right:
-        if (drone.x < widthgarden - 1) drone.x++; else 
+        if (drone.x < widthgarden - 1) drone.x++; else
             MessageBox(NULL, L"Не могу двигаться вправо - граница поля!", L"Предупреждение", MB_OK | MB_ICONWARNING);
 
         break;
@@ -220,10 +220,20 @@ void move(Direction dir) {
     InvalidateRect(FindWindow(szWindowClass, NULL), NULL, FALSE);
 }
 
+void droneto(int y, int x) {
+    if ((y < heightgarden && y >= 0) && (x < widthgarden && x >= 0)) {
+        drone.y = y;
+        drone.x = x;
+    }
+    else
+        MessageBox(NULL, L"Не могу перейти на эту клетку - граница поля!", L"Предупреждение", MB_OK | MB_ICONWARNING);
+    wait_with_check(move_delay);
+}
+
 #define MAX_PLANTINGS 50
 
-const int GROW_TIME = 30000; 
-const int GROW_STAGES = 5; 
+const int GROW_TIME = 30000;
+const int GROW_STAGES = 5;
 
 // Обновите структуру
 typedef struct {
@@ -280,7 +290,15 @@ int whattype() {
     return garden[drone.y][drone.x];
 }
 
-void ResetPosition() {
+int getheightofgarden() {
+    return heightgarden;
+}
+
+int getwidthofgarden() {
+    return widthgarden;
+}
+
+void resetposition() {
     drone.y = 0;
     drone.x = 0;
 }
@@ -291,7 +309,7 @@ void wait(int milliseconds) {
 
 /*void set_speed(int speed) {
     move_delay = 500 / speed;
-    if (move_delay < 30) move_delay = 30; 
+    if (move_delay < 30) move_delay = 30;
     if (move_delay > 500) move_delay = 500;
 }*/
 
@@ -489,8 +507,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     int red = 240 - stage * 10;
                     HBRUSH hStageBrush = CreateSolidBrush(RGB(red, green, 100));
                     SelectObject(hdcMem, hblackPen);
-                    SelectObject(hdcMem, hStageBrush); 
-                    Rectangle(hdcMem, j * widthbed, i * heightbed, 
+                    SelectObject(hdcMem, hStageBrush);
+                    Rectangle(hdcMem, j * widthbed, i * heightbed,
                         j * widthbed + widthbed, i * heightbed + heightbed);
                     DeleteObject(hStageBrush);
                 }
