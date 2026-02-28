@@ -1,6 +1,14 @@
 // MyScript.c
 #include "Commands.h"
 
+//этот файл будет пустым тут будут прописываться все функции игрока
+// 
+//void execute_script() {
+//
+//    //Ваш код
+//
+//}
+
 void ph() {
     if (whattype() == 0) {
         plant();

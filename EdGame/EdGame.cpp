@@ -102,8 +102,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        создается и выводится главное окно программы.
 //
 
-const int widthgarden = 5;
-const int heightgarden = 5;
+const int widthgarden = 10;
+const int heightgarden = 10;
 
 const int widthbed = 100;
 const int heightbed = 100;
