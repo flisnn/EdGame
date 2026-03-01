@@ -1,6 +1,7 @@
 ﻿// EdGame.cpp : Определяет точку входа для приложения.
 //
 
+#define _CRT_SECURE_NO_WARNINGS
 #include "framework.h"
 #include "EdGame.h"
 #include "Commands.h"
@@ -12,9 +13,13 @@
 #define MAX_LOADSTRING 100
 
 bool app_closing = false;
+bool info = false;
+bool seeds = false;
+bool shop = false;
 HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING];
 WCHAR szWindowClass[MAX_LOADSTRING];
+HWND g_hWnd = NULL;
 
 // Объявление функции из скрипта
 extern void execute_script(void);
@@ -101,7 +106,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        В этой функции маркер экземпляра сохраняется в глобальной переменной, а также
 //        создается и выводится главное окно программы.
 //
-
+int score = 0;
+SeedType current_seed = seed_wheat;
 const int widthgarden = 10;
 const int heightgarden = 10;
 
@@ -127,13 +133,13 @@ HBRUSH hredBrush;
 HPEN hblackPen;
 HPEN hwhitePen;
 
-void wheat(HDC hdc, int fy, int fx) {
+void drawwheat(HDC hdc, int fy, int fx) {
     SelectObject(hdc, hblackPen);
     SelectObject(hdc, hyellowBrush);
     Rectangle(hdc, fx * widthbed, fy * heightbed, fx * widthbed + widthbed, fy * heightbed + heightbed);
 }
 
-void empty(HDC hdc, int fy, int fx) {
+void drawempty(HDC hdc, int fy, int fx) {
     SelectObject(hdc, hblackPen);
     SelectObject(hdc, hbrownBrush);
     Rectangle(hdc, fx * widthbed, fy * heightbed, fx * widthbed + widthbed, fy * heightbed + heightbed);
@@ -152,7 +158,22 @@ void drawdrone(HDC hdc, int fy, int fx) {
 void fillgarden() {
     for (int i = 0; i < heightgarden; i++) {
         for (int j = 0; j < widthgarden; j++) {
-            garden[i][j] = rand() % 2;
+            int type = rand() % 100;
+            if (type <= 20) {
+                garden[i][j] = 0;
+            }
+            else if (type <= 55) {
+                garden[i][j] = 1;
+            }
+            else if (type <= 75) {
+                garden[i][j] = 2;
+            }
+            else if (type <= 90) {
+                garden[i][j] = 4;
+            }
+            else if (type <= 100) {
+                garden[i][j] = 3;
+            }
         }
     }
     gardenfill = true;
@@ -162,10 +183,10 @@ void drawgarden(HDC hdc) {
     for (int i = 0; i < heightgarden; i++) {
         for (int j = 0; j < widthgarden; j++) {
             if (garden[i][j] == 0) {
-                empty(hdc, i, j);
+                drawempty(hdc, i, j);
             }
             else if (garden[i][j] == 1) {
-                wheat(hdc, i, j);
+                drawwheat(hdc, i, j);
             }
         }
     }
@@ -242,6 +263,7 @@ typedef struct {
     int y;
     int start_time;
     int stage;
+    int result;
     int total_grow_time;
 } Planting;
 
@@ -255,15 +277,44 @@ int find_free_planting() {
 }
 
 void plant() {
-    if (garden[drone.y][drone.x] == 0) {
+    if (garden[drone.y][drone.x] == 0 && garden[drone.y][drone.x] < 10) {
         int slot = find_free_planting();
         if (slot != -1) {
+            if (seeds) {
+                plantings[slot].result = current_seed + 1;
+            }
+            else {
+                int type = rand() % 100;
+                if (type <= 50) {
+                    plantings[slot].result = 1;
+                }
+                else if (type <= 75) {
+                    plantings[slot].result = 2;
+                }
+                else if (type <= 90) {
+                    plantings[slot].result = 4;
+                }
+                else if (type <= 100) {
+                    plantings[slot].result = 3;
+                }
+            }
             plantings[slot].active = true;
             plantings[slot].x = drone.x;
             plantings[slot].y = drone.y;
             plantings[slot].start_time = GetTickCount();
             plantings[slot].stage = 0;
-            plantings[slot].total_grow_time = GROW_TIME;
+            if (plantings[slot].result == 1) {
+                plantings[slot].total_grow_time = GROW_TIME - 15000;
+            }
+            else if (plantings[slot].result == 2) {
+                plantings[slot].total_grow_time = GROW_TIME - 5000;
+            }
+            else if (plantings[slot].result == 3) {
+                plantings[slot].total_grow_time = GROW_TIME;
+            }
+            else if (plantings[slot].result == 4) {
+                plantings[slot].total_grow_time = GROW_TIME + 15000;
+            }
 
             garden[drone.y][drone.x] = 10;
             InvalidateRect(FindWindow(szWindowClass, NULL), NULL, FALSE);
@@ -276,8 +327,22 @@ void plant() {
 }
 
 void harvest() {
-    if (garden[drone.y][drone.x] != 0) {
+    if (garden[drone.y][drone.x] != 0 && garden[drone.y][drone.x] < 10) {
         wait_with_check(1000);
+        if (info) {
+            if (garden[drone.y][drone.x] == 1) {
+                score += 1;
+            }
+            else if (garden[drone.y][drone.x] == 2) {
+                score += 2;
+            }
+            else if (garden[drone.y][drone.x] == 3) {
+                score += 8;
+            }
+            else if (garden[drone.y][drone.x] == 4) {
+                score += 5;
+            }
+        } else wait_with_check(1000);
         garden[drone.y][drone.x] = 0;
         InvalidateRect(FindWindow(szWindowClass, NULL), NULL, FALSE);
     }
@@ -286,8 +351,66 @@ void harvest() {
     }
 }
 
-int whattype() {
-    return garden[drone.y][drone.x];
+void infoswitch(bool value) {
+    info = value;
+
+    if (g_hWnd != NULL) {
+        RECT rect;
+        GetWindowRect(g_hWnd, &rect);
+
+        int newWidth;
+        if (info) {
+            newWidth = (widthgarden + 6) * widthbed + 16;
+        }
+        else {
+            newWidth = widthgarden * widthbed + 16;
+        }
+
+        SetWindowPos(g_hWnd, NULL, rect.left, rect.top,
+            newWidth, rect.bottom - rect.top,
+            SWP_NOMOVE | SWP_NOZORDER);
+
+        InvalidateRect(g_hWnd, NULL, TRUE);
+    }
+}
+
+void seedswitch(bool value){
+    seeds = value;
+}
+void shopswitch(bool value) {
+    shop = value;
+}
+
+void set_seed(SeedType seed) {
+    if (seeds) {
+        if (seed >= seed_wheat && seed <= seed_corn) {
+            current_seed = seed;
+        }
+    }
+    else {
+        MessageBox(NULL, L"Не могу выбрать семена - функция не доступна!", L"Предупреждение", MB_OK | MB_ICONWARNING);
+    }
+}
+
+CellType whattype() {
+    if (garden[drone.y][drone.x] == 0) {
+        return empty;
+    }
+    else if (garden[drone.y][drone.x] == 1) {
+        return wheat;
+    }
+    else if (garden[drone.y][drone.x] == 2) {
+        return carrot;
+    }
+    else if (garden[drone.y][drone.x] == 3) {
+        return pumpkin;
+    }
+    else if (garden[drone.y][drone.x] == 4) {
+        return corn;
+    }
+    else {
+        return growing;
+    }
 }
 
 int getheightofgarden() {
@@ -365,8 +488,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance;
 
-    int windowWidth = widthgarden * widthbed + 16;
-    int windowHeight = heightgarden * heightbed + 60;
+    int windowWidth;
+    if (info) windowWidth = (widthgarden + 6) * widthbed + 16;
+    else windowWidth = widthgarden * widthbed + 16;
+    int windowHeight = heightgarden * heightbed + 59;
 
     HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, 0, windowWidth, windowHeight, nullptr, nullptr, hInstance, nullptr);
@@ -376,10 +501,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         return FALSE;
     }
 
+    g_hWnd = hWnd;  // Сохраняем дескриптор
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
 
-    // Запускаем скрипт
     execute_script();
 
     return TRUE;
@@ -448,8 +573,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 int elapsed = current_time - plantings[i].start_time;
 
                 if (elapsed >= plantings[i].total_grow_time) {
-                    // Завершаем рост
-                    garden[plantings[i].y][plantings[i].x] = 1;
+                    garden[plantings[i].y][plantings[i].x] = plantings[i].result;
                     plantings[i].active = false;
                     need_redraw = true;
                 }
@@ -496,10 +620,89 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                         j * widthbed + widthbed, i * heightbed + heightbed);
                 }
                 else if (garden[i][j] == 1) {
+                    HBRUSH hBrush = CreateSolidBrush(RGB(253, 219, 109));
                     SelectObject(hdcMem, hblackPen);
-                    SelectObject(hdcMem, hyellowBrush);
+                    SelectObject(hdcMem, hBrush);
                     Rectangle(hdcMem, j * widthbed, i * heightbed,
                         j * widthbed + widthbed, i * heightbed + heightbed);
+                    DeleteObject(hBrush);
+                }
+                else if (garden[i][j] == 2) {
+                    HBRUSH hBrush = CreateSolidBrush(RGB(255, 140, 0));
+                    SelectObject(hdcMem, hblackPen);
+                    SelectObject(hdcMem, hBrush);
+                    Rectangle(hdcMem, j * widthbed, i * heightbed,
+                        j * widthbed + widthbed, i * heightbed + heightbed);
+
+                    HBRUSH hOrangeBrush = CreateSolidBrush(RGB(255, 140, 0));
+                    SelectObject(hdcMem, hOrangeBrush);
+                    SelectObject(hdcMem, hblackPen);
+
+                    POINT carrot[4] = {
+                        {j * widthbed + 0.3 * widthbed, i * heightbed + heightbed * 0.4},
+                        {j * widthbed + 0.7 * widthbed,  i * heightbed + heightbed * 0.4},
+                        {j * widthbed + 0.5 * widthbed, i * heightbed + heightbed * 0.9},
+                        {j * widthbed + 0.3 * widthbed, i * heightbed + heightbed * 0.4}
+                    };
+                    Polygon(hdcMem, carrot, 4);
+
+                    HPEN hGreenPen = CreatePen(PS_SOLID, 2, RGB(0, 150, 0));
+                    SelectObject(hdcMem, hGreenPen);
+
+                    for (int k = 0; k < 5; k++) {
+                        MoveToEx(hdcMem, j* widthbed + 0.5 * widthbed, i* heightbed + heightbed * 0.4, NULL);
+                        LineTo(hdcMem, j* widthbed + 0.25 * widthbed + k * 0.125 * widthbed, i* heightbed + heightbed * 0.2);
+                    }
+
+                    DeleteObject(hOrangeBrush);
+                    DeleteObject(hGreenPen);
+                }
+                else if (garden[i][j] == 3) {
+                    HBRUSH hBrush = CreateSolidBrush(RGB(255, 165, 0));
+                    SelectObject(hdcMem, hblackPen);
+                    SelectObject(hdcMem, hBrush);
+                    Rectangle(hdcMem, j * widthbed, i * heightbed,
+                        j * widthbed + widthbed, i * heightbed + heightbed);
+                    DeleteObject(hBrush);
+                    Ellipse(hdcMem,
+                        j* widthbed + 0.1 * widthbed, i* heightbed + 0.3 * heightbed,
+                        j* widthbed + 0.9 * widthbed, i* heightbed + 0.9 * heightbed);
+                    Ellipse(hdcMem,
+                        j* widthbed + 0.25 * widthbed, i* heightbed + 0.3 * heightbed,
+                        j* widthbed + 0.75 * widthbed, i* heightbed + 0.9 * heightbed);
+                    Ellipse(hdcMem,
+                        j* widthbed + 0.4 * widthbed, i* heightbed + 0.3 * heightbed,
+                        j* widthbed + 0.6 * widthbed, i* heightbed + 0.9 * heightbed);
+                    HPEN hGreenPen = CreatePen(PS_SOLID, 4, RGB(0, 150, 0));
+                    SelectObject(hdcMem, hGreenPen);
+
+                    MoveToEx(hdcMem, j * widthbed + 0.5 * widthbed, i * heightbed + heightbed * 0.3, NULL);
+                    LineTo(hdcMem, j* widthbed + 0.5 * widthbed, i* heightbed + heightbed * 0.2);
+                    DeleteObject(hGreenPen);
+
+                }
+                else if (garden[i][j] == 4) {
+                    HBRUSH hBrush = CreateSolidBrush(RGB(255, 215, 0));
+                    SelectObject(hdcMem, hblackPen);
+                    SelectObject(hdcMem, hBrush);
+                    Rectangle(hdcMem, j * widthbed, i * heightbed,
+                        j * widthbed + widthbed, i * heightbed + heightbed);
+                    Ellipse(hdcMem,
+                        j* widthbed + 0.35 * widthbed, i* heightbed + 0.2 * heightbed,
+                        j* widthbed + 0.65 * widthbed, i* heightbed + 0.75 * heightbed);
+                    hBrush = CreateSolidBrush(RGB(34, 177, 76));
+                    SelectObject(hdcMem, hBrush);
+                    Chord(hdcMem,
+                        j* widthbed + 0.3 * widthbed, i* heightbed + 0.2 * heightbed,
+                        j* widthbed + 0.7 * widthbed, i* heightbed + 0.8 * heightbed,
+                        j * widthbed + 0.25 * widthbed, i * heightbed + 0.8 * heightbed,
+                        j* widthbed + 0.8 * widthbed, i* heightbed + 0.3 * heightbed);
+                    Chord(hdcMem,
+                        j * widthbed + 0.3 * widthbed, i * heightbed + 0.2 * heightbed,
+                        j * widthbed + 0.7 * widthbed, i * heightbed + 0.8 * heightbed,
+                        j * widthbed + 0.2 * widthbed, i * heightbed + 0.3 * heightbed,
+                        j * widthbed + 0.75 * widthbed, i * heightbed + 0.8 * heightbed);
+                    DeleteObject(hBrush);
                 }
                 else if (garden[i][j] >= 10 && garden[i][j] <= 14) {
                     int stage = garden[i][j] - 10;
@@ -548,8 +751,112 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             drone.x * widthbed + widthbed * 0.45,
             drone.y * heightbed + heightbed - 1);
 
-        BitBlt(hdc, 0, 0, clientRect.right, clientRect.bottom, hdcMem, 0, 0, SRCCOPY);
+        if (info) {
+            HBRUSH hBrush = CreateSolidBrush(RGB(253, 219, 109));
+            SelectObject(hdcMem, hblackPen);
+            SelectObject(hdcMem, hBrush);
+            Rectangle(hdcMem, (widthgarden + 1) * widthbed, 1 * heightbed,
+                (widthgarden + 1)* widthbed + widthbed, 1 * heightbed + heightbed);
+            DeleteObject(hBrush);
 
+
+
+            hBrush = CreateSolidBrush(RGB(255, 140, 0));
+            SelectObject(hdcMem, hblackPen);
+            SelectObject(hdcMem, hBrush);
+            Rectangle(hdcMem, (widthgarden + 2)* widthbed, 1* heightbed,
+                (widthgarden + 2)* widthbed + widthbed, 1* heightbed + heightbed);
+            HBRUSH hOrangeBrush = CreateSolidBrush(RGB(255, 140, 0));
+            SelectObject(hdcMem, hOrangeBrush);
+            SelectObject(hdcMem, hblackPen);
+            POINT carrot[4] = {
+                {(widthgarden + 2) * widthbed + 0.3 * widthbed, 1 * heightbed + heightbed * 0.4},
+                {(widthgarden + 2) * widthbed + 0.7 * widthbed,  1 * heightbed + heightbed * 0.4},
+                {(widthgarden + 2) * widthbed + 0.5 * widthbed, 1 * heightbed + heightbed * 0.9},
+                {(widthgarden + 2) * widthbed + 0.3 * widthbed, 1 * heightbed + heightbed * 0.4}
+            };
+            Polygon(hdcMem, carrot, 4);
+            HPEN hGreenPen = CreatePen(PS_SOLID, 2, RGB(0, 150, 0));
+            SelectObject(hdcMem, hGreenPen);
+            for (int k = 0; k < 5; k++) {
+                MoveToEx(hdcMem, (widthgarden + 2) * widthbed + 0.5 * widthbed, 1 * heightbed + heightbed * 0.4, NULL);
+                LineTo(hdcMem, (widthgarden + 2) * widthbed + 0.25 * widthbed + k * 0.125 * widthbed, 1 * heightbed + heightbed * 0.2);
+            }
+            DeleteObject(hOrangeBrush);
+            DeleteObject(hGreenPen);
+
+
+
+            hBrush = CreateSolidBrush(RGB(255, 165, 0));
+            SelectObject(hdcMem, hblackPen);
+            SelectObject(hdcMem, hBrush);
+            Rectangle(hdcMem, (widthgarden + 3) * widthbed, 1 * heightbed,
+                (widthgarden + 3) * widthbed + widthbed, 1 * heightbed + heightbed);
+            DeleteObject(hBrush);
+            Ellipse(hdcMem,
+                (widthgarden + 3) * widthbed + 0.1 * widthbed, 1 * heightbed + 0.3 * heightbed,
+                (widthgarden + 3) * widthbed + 0.9 * widthbed, 1 * heightbed + 0.9 * heightbed);
+            Ellipse(hdcMem,
+                (widthgarden + 3) * widthbed + 0.25 * widthbed, 1 * heightbed + 0.3 * heightbed,
+                (widthgarden + 3) * widthbed + 0.75 * widthbed, 1 * heightbed + 0.9 * heightbed);
+            Ellipse(hdcMem,
+                (widthgarden + 3) * widthbed + 0.4 * widthbed, 1 * heightbed + 0.3 * heightbed,
+                (widthgarden + 3) * widthbed + 0.6 * widthbed, 1 * heightbed + 0.9 * heightbed);
+            hGreenPen = CreatePen(PS_SOLID, 4, RGB(0, 150, 0));
+            SelectObject(hdcMem, hGreenPen);
+
+            MoveToEx(hdcMem, (widthgarden + 3) * widthbed + 0.5 * widthbed, 1 * heightbed + heightbed * 0.3, NULL);
+            LineTo(hdcMem, (widthgarden + 3) * widthbed + 0.5 * widthbed, 1 * heightbed + heightbed * 0.2);
+            DeleteObject(hGreenPen);
+
+
+
+            hBrush = CreateSolidBrush(RGB(255, 215, 0));
+            SelectObject(hdcMem, hblackPen);
+            SelectObject(hdcMem, hBrush);
+            Rectangle(hdcMem, (widthgarden + 4) * widthbed, 1 * heightbed,
+                (widthgarden + 4) * widthbed + widthbed, 1 * heightbed + heightbed);
+            Ellipse(hdcMem,
+                (widthgarden + 4) * widthbed + 0.35 * widthbed, 1 * heightbed + 0.2 * heightbed,
+                (widthgarden + 4) * widthbed + 0.65 * widthbed, 1 * heightbed + 0.75 * heightbed);
+            hBrush = CreateSolidBrush(RGB(34, 177, 76));
+            SelectObject(hdcMem, hBrush);
+            Chord(hdcMem,
+                (widthgarden + 4) * widthbed + 0.3 * widthbed, 1 * heightbed + 0.2 * heightbed,
+                (widthgarden + 4) * widthbed + 0.7 * widthbed, 1 * heightbed + 0.8 * heightbed,
+                (widthgarden + 4) * widthbed + 0.25 * widthbed, 1 * heightbed + 0.8 * heightbed,
+                (widthgarden + 4) * widthbed + 0.8 * widthbed, 1 * heightbed + 0.3 * heightbed);
+            Chord(hdcMem,
+                (widthgarden + 4) * widthbed + 0.3 * widthbed, 1 * heightbed + 0.2 * heightbed,
+                (widthgarden + 4) * widthbed + 0.7 * widthbed, 1 * heightbed + 0.8 * heightbed,
+                (widthgarden + 4) * widthbed + 0.2 * widthbed, 1 * heightbed + 0.3 * heightbed,
+                (widthgarden + 4) * widthbed + 0.75 * widthbed, 1 * heightbed + 0.8 * heightbed);
+            DeleteObject(hBrush);
+
+            hGreenPen = CreatePen(PS_SOLID, 4, RGB(0, 150, 0));
+            SelectObject(hdcMem, hGreenPen);
+            SelectObject(hdcMem, GetStockObject(NULL_BRUSH));
+            Rectangle(hdcMem, (widthgarden + current_seed + 1) * widthbed, 1 * heightbed,
+                (widthgarden + current_seed + 1) * widthbed + widthbed, 1 * heightbed + heightbed);
+            DeleteObject(hGreenPen);
+        }
+
+        BitBlt(hdc, 0, 0, clientRect.right, clientRect.bottom, hdcMem, 0, 0, SRCCOPY);
+        if (info) {
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, RGB(0, 0, 0));
+
+            char buffer[100];
+            sprintf(buffer, "Позиция дрона: X=%d Y=%d", drone.x, drone.y);
+            TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.1, buffer, strlen(buffer));
+            sprintf(buffer, "Ваши Баллы: %d", score);
+            TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.3, buffer, strlen(buffer));
+            if (seeds) {
+                sprintf(buffer, "Ваши выбранные семена:");
+                TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.8, buffer, strlen(buffer));
+            }
+
+        }
         SelectObject(hdcMem, hbmOld);
         DeleteObject(hbmMem);
         DeleteDC(hdcMem);
