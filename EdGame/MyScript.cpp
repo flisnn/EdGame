@@ -22,6 +22,7 @@ void ph() {
 void execute_script() {
     infoswitch(true);
     seedswitch(true);
+    set_seed(pumpkin);
     /*for (int row = 0; row < getheightofgarden(); row++) {
         if (row % 2 == 0) {
             for (int col = 0; col < getwidthofgarden() - 1; col++) {

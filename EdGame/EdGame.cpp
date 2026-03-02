@@ -107,9 +107,14 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        создается и выводится главное окно программы.
 //
 int score = 0;
-SeedType current_seed = seed_wheat;
+CellType current_seed = wheat;
 const int widthgarden = 10;
 const int heightgarden = 10;
+
+DWORD timer_start = 0;
+DWORD timer_end = 0;
+DWORD timer_value = 0;
+bool timer_running = false;
 
 const int widthbed = 100;
 const int heightbed = 100;
@@ -253,7 +258,7 @@ void droneto(int y, int x) {
 
 #define MAX_PLANTINGS 50
 
-const int GROW_TIME = 30000;
+const int GROW_TIME = 15000;
 const int GROW_STAGES = 5;
 
 // Обновите структуру
@@ -281,7 +286,7 @@ void plant() {
         int slot = find_free_planting();
         if (slot != -1) {
             if (seeds) {
-                plantings[slot].result = current_seed + 1;
+                plantings[slot].result = current_seed;
             }
             else {
                 int type = rand() % 100;
@@ -377,14 +382,18 @@ void infoswitch(bool value) {
 void seedswitch(bool value){
     seeds = value;
 }
+
 void shopswitch(bool value) {
     shop = value;
 }
 
-void set_seed(SeedType seed) {
+void set_seed(CellType seed) {
     if (seeds) {
-        if (seed >= seed_wheat && seed <= seed_corn) {
+        if (seed >= wheat && seed <= corn) {
             current_seed = seed;
+        }
+        else {
+            MessageBox(NULL, L"Не могу выбрать этот вид семян!", L"Предупреждение", MB_OK | MB_ICONWARNING);
         }
     }
     else {
@@ -428,6 +437,45 @@ void resetposition() {
 
 void wait(int milliseconds) {
     wait_with_check(milliseconds);
+}
+
+void start_timer() {
+    if (info) {
+        timer_start = GetTickCount();
+        timer_running = true;
+    }
+    else {
+        MessageBox(NULL, L"Не могу использовать эту функцию - функция не доступна!", L"Предупреждение", MB_OK | MB_ICONWARNING);
+    }
+}
+
+void stop_timer() {
+    if (info) {
+        if (timer_running) {
+            timer_end = GetTickCount();
+            timer_running = false;
+        }
+        else {
+            MessageBox(NULL, L"Не могу остановить таймер - таймер не запущен!", L"Предупреждение", MB_OK | MB_ICONWARNING);
+        }
+    }
+    else {
+        MessageBox(NULL, L"Не могу использовать эту функцию - функция не доступна!", L"Предупреждение", MB_OK | MB_ICONWARNING);
+    }
+}
+
+void get_elapsed_time() {
+    if (info) {
+        if (timer_running) {
+            timer_value = GetTickCount() - timer_start;
+        }
+        else {
+            timer_value = timer_end - timer_start;
+        }
+    }
+    else {
+        MessageBox(NULL, L"Не могу использовать эту функцию - функция не доступна!", L"Предупреждение", MB_OK | MB_ICONWARNING);
+    }
 }
 
 /*void set_speed(int speed) {
@@ -836,8 +884,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             hGreenPen = CreatePen(PS_SOLID, 4, RGB(0, 150, 0));
             SelectObject(hdcMem, hGreenPen);
             SelectObject(hdcMem, GetStockObject(NULL_BRUSH));
-            Rectangle(hdcMem, (widthgarden + current_seed + 1) * widthbed, 1 * heightbed,
-                (widthgarden + current_seed + 1) * widthbed + widthbed, 1 * heightbed + heightbed);
+            Rectangle(hdcMem, (widthgarden + current_seed) * widthbed, 1 * heightbed,
+                (widthgarden + current_seed) * widthbed + widthbed, 1 * heightbed + heightbed);
             DeleteObject(hGreenPen);
         }
 
@@ -851,6 +899,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.1, buffer, strlen(buffer));
             sprintf(buffer, "Ваши Баллы: %d", score);
             TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.3, buffer, strlen(buffer));
+            sprintf(buffer, "Конечное значение таймера: %d", timer_value);
+            TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.5, buffer, strlen(buffer));
             if (seeds) {
                 sprintf(buffer, "Ваши выбранные семена:");
                 TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.8, buffer, strlen(buffer));

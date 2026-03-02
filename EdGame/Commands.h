@@ -10,13 +10,6 @@ typedef enum {
 } Direction;
 
 typedef enum {
-    seed_wheat, 
-    seed_carrot,
-    seed_pumpkin,
-    seed_corn
-} SeedType;
-
-typedef enum {
     empty,    
     wheat,     
     carrot,    
@@ -38,12 +31,16 @@ void infoswitch(bool value);
 void seedswitch(bool value);
 void shopswitch(bool value);
 
-void set_seed(SeedType seed);            
+void set_seed(CellType seed);            
 
 CellType whattype();
 int getwidthofgarden();
 int getheightofgarden();
 void resetposition();
 void wait(int milliseconds);
+
+void start_timer();
+void stop_timer();
+void get_elapsed_time();
 
 #endif
