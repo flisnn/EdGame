@@ -10,37 +10,50 @@ typedef enum {
 } Direction;
 
 typedef enum {
-    empty,    
-    wheat,     
-    carrot,    
-    pumpkin,   
-    corn,     
+    empty = 0,    
+    wheat = 1,     
+    carrot = 2,    
+    pumpkin = 3,   
+    corn = 4,     
     growing    
 } CellType;
 
-extern bool info;
-extern bool seeds;
-extern bool shop;
+
+void randomswitch(int value);
+void set_garden_size(int new_height, int new_width);
 
 void move(Direction dir);
-void droneto(int y, int x);
 void plant();                 
 void harvest();
-
-void infoswitch(bool value);
-void seedswitch(bool value);
-void shopswitch(bool value);
-
-void set_seed(CellType seed);            
-
 CellType whattype();
+CellType whattype(int x, int y);
 int getwidthofgarden();
 int getheightofgarden();
+void droneto(int y, int x);
 void resetposition();
 void wait(int milliseconds);
+void loadgame();
+void savegame();
 
+
+
+extern bool seeds;
+void set_seed(CellType seed);
+void set_seed(int seed);
+void seedswitch(bool value);
+
+
+
+extern bool info;
+void infoswitch(bool value);
 void start_timer();
 void stop_timer();
 void get_elapsed_time();
+
+
+
+extern bool shop;
+void shopswitch(bool value);
+
 
 #endif

@@ -106,10 +106,15 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        В этой функции маркер экземпляра сохраняется в глобальной переменной, а также
 //        создается и выводится главное окно программы.
 //
+
+//РАЗМЕРЫ ПОЛЯ
+int widthgarden = 10;//ширина поля
+int heightgarden = 1;//высота поля
+//РАЗМЕРЯ ПОЛЯ
+
+int random = 1;
 int score = 0;
 CellType current_seed = wheat;
-const int widthgarden = 10;
-const int heightgarden = 10;
 
 DWORD timer_start = 0;
 DWORD timer_end = 0;
@@ -119,8 +124,7 @@ bool timer_running = false;
 const int widthbed = 100;
 const int heightbed = 100;
 
-int garden[heightgarden][widthgarden];
-
+int** garden;
 bool gardenfill = false;
 
 struct Drone {
@@ -138,67 +142,180 @@ HBRUSH hredBrush;
 HPEN hblackPen;
 HPEN hwhitePen;
 
-void drawwheat(HDC hdc, int fy, int fx) {
-    SelectObject(hdc, hblackPen);
-    SelectObject(hdc, hyellowBrush);
-    Rectangle(hdc, fx * widthbed, fy * heightbed, fx * widthbed + widthbed, fy * heightbed + heightbed);
+void create_garden(int height, int width) {
+    garden = (int**)malloc(height * sizeof(int*));
+
+    for (int i = 0; i < height; i++) {
+        garden[i] = (int*)malloc(width * sizeof(int));
+    }
 }
 
-void drawempty(HDC hdc, int fy, int fx) {
-    SelectObject(hdc, hblackPen);
-    SelectObject(hdc, hbrownBrush);
-    Rectangle(hdc, fx * widthbed, fy * heightbed, fx * widthbed + widthbed, fy * heightbed + heightbed);
-}
-
-void drawdrone(HDC hdc, int fy, int fx) {
-    SelectObject(hdc, hwhitePen);
-    SelectObject(hdc, hblackBrush);
-    Rectangle(hdc, fx * widthbed + widthbed * 0.35, fy * heightbed + heightbed * 0.25, fx * widthbed + widthbed - widthbed * 0.35, fy * heightbed + heightbed - heightbed * 0.25);
-    Ellipse(hdc, fx * widthbed + 1, fy * heightbed + 1, fx * widthbed + widthbed * 0.45, fy * heightbed + heightbed * 0.45);
-    Ellipse(hdc, fx * widthbed + widthbed * 0.55, fy * heightbed + 1, fx * widthbed + widthbed - 1, fy * heightbed + heightbed * 0.45);
-    Ellipse(hdc, fx * widthbed + widthbed * 0.55, fy * heightbed + heightbed * 0.55, fx * widthbed + widthbed - 1, fy * heightbed + heightbed - 1);
-    Ellipse(hdc, fx * widthbed + 1, fy * heightbed + heightbed * 0.55, fx * widthbed + widthbed * 0.45, fy * heightbed + heightbed - 1);
+void free_garden(int height) {
+    if (garden != NULL) {
+        for (int i = 0; i < height; i++) {
+            if (garden[i] != NULL) {
+                free(garden[i]);
+            }
+        }
+        free(garden);
+        garden = NULL;
+    }
 }
 
 void fillgarden() {
+    if (garden == NULL) {
+        MessageBox(NULL, L"Сад не инициализирован!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return;
+    }
     for (int i = 0; i < heightgarden; i++) {
         for (int j = 0; j < widthgarden; j++) {
-            int type = rand() % 100;
-            if (type <= 20) {
+            //РАНДОМ
+            if (random == 0) {
                 garden[i][j] = 0;
             }
-            else if (type <= 55) {
+            else if (random == 1) {
                 garden[i][j] = 1;
             }
-            else if (type <= 75) {
-                garden[i][j] = 2;
+            else {
+                int type = rand() % 100;
+                if (type <= 20) {
+                    garden[i][j] = 0;
+                }
+                else if (type <= 55) {
+                    garden[i][j] = 1;
+                }
+                else if (type <= 75) {
+                    garden[i][j] = 2;
+                }
+                else if (type <= 90) {
+                    garden[i][j] = 4;
+                }
+                else if (type <= 100) {
+                    garden[i][j] = 3;
+                }
             }
-            else if (type <= 90) {
-                garden[i][j] = 4;
-            }
-            else if (type <= 100) {
-                garden[i][j] = 3;
-            }
+            //РАНДОМ
         }
     }
     gardenfill = true;
 }
 
-void drawgarden(HDC hdc) {
+void update_window_size() {
+    if (g_hWnd != NULL) {
+        RECT rect;
+        GetWindowRect(g_hWnd, &rect);
+
+        int newWidth;
+        if (info) {
+            newWidth = (widthgarden + 6) * widthbed + 16;
+        }
+        else {
+            newWidth = widthgarden * widthbed + 16;
+        }
+
+        int newHeight = heightgarden * heightbed + 59;
+
+        SetWindowPos(g_hWnd, NULL, rect.left, rect.top,
+            newWidth, newHeight,
+            SWP_NOMOVE | SWP_NOZORDER);
+
+        InvalidateRect(g_hWnd, NULL, TRUE);
+    }
+}
+
+void set_garden_size(int new_height, int new_width) {
+    if (new_height <= 0 || new_width <= 0 ||
+        new_height > 50 || new_width > 50) {
+        MessageBox(NULL, L"Недопустимый размер поля!", L"Ошибка", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    int old_height = heightgarden;
+    int old_width = widthgarden;
+
+    int** temp_garden = NULL;
+
+    if (garden != NULL) {
+        temp_garden = (int**)malloc(old_height * sizeof(int*));
+        for (int i = 0; i < old_height; i++) {
+            temp_garden[i] = (int*)malloc(old_width * sizeof(int));
+            for (int j = 0; j < old_width; j++) {
+                temp_garden[i][j] = garden[i][j];
+            }
+        }
+
+        for (int i = 0; i < old_height; i++) {
+            free(garden[i]);
+        }
+        free(garden);
+    }
+
+    heightgarden = new_height;
+    widthgarden = new_width;
+
+    garden = (int**)malloc(heightgarden * sizeof(int*));
+    for (int i = 0; i < heightgarden; i++) {
+        garden[i] = (int*)malloc(widthgarden * sizeof(int));
+    }
+
     for (int i = 0; i < heightgarden; i++) {
         for (int j = 0; j < widthgarden; j++) {
-            if (garden[i][j] == 0) {
-                drawempty(hdc, i, j);
+            if (temp_garden != NULL && i < old_height && j < old_width) {
+                garden[i][j] = temp_garden[i][j];
             }
-            else if (garden[i][j] == 1) {
-                drawwheat(hdc, i, j);
+            else {
+                //РАНДОМ
+                if (random == 0) {
+                    garden[i][j] = 0;
+                }
+                else if (random == 1) {
+                    garden[i][j] = 1;
+                }
+                else {
+                    int type = rand() % 100;
+                    if (type <= 20) {
+                        garden[i][j] = 0;
+                    }
+                    else if (type <= 55) {
+                        garden[i][j] = 1;
+                    }
+                    else if (type <= 75) {
+                        garden[i][j] = 2;
+                    }
+                    else if (type <= 90) {
+                        garden[i][j] = 4;
+                    }
+                    else {
+                        garden[i][j] = 3;
+                    }
+                }
+                //РАНДОМ
             }
         }
     }
-    drawdrone(hdc, drone.y, drone.x);
+
+    if (temp_garden != NULL) {
+        for (int i = 0; i < min(old_height, new_height); i++) {
+            for (int j = 0; j < min(old_width, new_width); j++) {
+                garden[i][j] = temp_garden[i][j];
+            }
+        }
+
+        for (int i = 0; i < old_height; i++) {
+            free(temp_garden[i]);
+        }
+        free(temp_garden);
+    }
+
+    update_window_size();
 }
 
-int move_delay = 500;
+void randomswitch(int value) {
+    random = value;
+    fillgarden();
+}
+
+int move_delay = 200;
 
 bool wait_with_check(int milliseconds) {
     DWORD start = GetTickCount();
@@ -254,6 +371,7 @@ void droneto(int y, int x) {
     else
         MessageBox(NULL, L"Не могу перейти на эту клетку - граница поля!", L"Предупреждение", MB_OK | MB_ICONWARNING);
     wait_with_check(move_delay);
+    InvalidateRect(FindWindow(szWindowClass, NULL), NULL, FALSE);
 }
 
 #define MAX_PLANTINGS 50
@@ -282,6 +400,11 @@ int find_free_planting() {
 }
 
 void plant() {
+    if (garden == NULL) {
+        MessageBox(NULL, L"Сад не инициализирован!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return;
+    }
+    if (garden[drone.y] == NULL) return;
     if (garden[drone.y][drone.x] == 0 && garden[drone.y][drone.x] < 10) {
         int slot = find_free_planting();
         if (slot != -1) {
@@ -289,18 +412,29 @@ void plant() {
                 plantings[slot].result = current_seed;
             }
             else {
-                int type = rand() % 100;
-                if (type <= 50) {
+                if (random == 0) {
+                    plantings[slot].result = 0;
+                }
+                else if (random == 1) {
                     plantings[slot].result = 1;
                 }
-                else if (type <= 75) {
-                    plantings[slot].result = 2;
-                }
-                else if (type <= 90) {
-                    plantings[slot].result = 4;
-                }
-                else if (type <= 100) {
-                    plantings[slot].result = 3;
+                else {
+                    int type = rand() % 100;
+                    if (type <= 20) {
+                        plantings[slot].result = 0;
+                    }
+                    else if (type <= 55) {
+                        plantings[slot].result = 1;
+                    }
+                    else if (type <= 75) {
+                        plantings[slot].result = 2;
+                    }
+                    else if (type <= 90) {
+                        plantings[slot].result = 4;
+                    }
+                    else if (type <= 100) {
+                        plantings[slot].result = 3;
+                    }
                 }
             }
             plantings[slot].active = true;
@@ -309,16 +443,16 @@ void plant() {
             plantings[slot].start_time = GetTickCount();
             plantings[slot].stage = 0;
             if (plantings[slot].result == 1) {
-                plantings[slot].total_grow_time = GROW_TIME - 15000;
+                plantings[slot].total_grow_time = GROW_TIME;
             }
             else if (plantings[slot].result == 2) {
-                plantings[slot].total_grow_time = GROW_TIME - 5000;
+                plantings[slot].total_grow_time = GROW_TIME;
             }
             else if (plantings[slot].result == 3) {
                 plantings[slot].total_grow_time = GROW_TIME;
             }
             else if (plantings[slot].result == 4) {
-                plantings[slot].total_grow_time = GROW_TIME + 15000;
+                plantings[slot].total_grow_time = GROW_TIME;
             }
 
             garden[drone.y][drone.x] = 10;
@@ -332,23 +466,32 @@ void plant() {
 }
 
 void harvest() {
+    if (app_closing) {
+        return;
+    }
+    if (garden == NULL) {
+        MessageBox(NULL, L"Сад не инициализирован!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return;
+    }
+    if (garden[drone.y] == NULL) return;
     if (garden[drone.y][drone.x] != 0 && garden[drone.y][drone.x] < 10) {
         wait_with_check(1000);
+        if (app_closing) {
+            return;
+        }
         if (info) {
-            if (garden[drone.y][drone.x] == 1) {
-                score += 1;
+            switch (garden[drone.y][drone.x]) {
+            case 1: score += 1; break;
+            case 2: score += 2; break;
+            case 3: score += 8; break;
+            case 4: score += 5; break;
             }
-            else if (garden[drone.y][drone.x] == 2) {
-                score += 2;
-            }
-            else if (garden[drone.y][drone.x] == 3) {
-                score += 8;
-            }
-            else if (garden[drone.y][drone.x] == 4) {
-                score += 5;
-            }
-        } else wait_with_check(1000);
-        garden[drone.y][drone.x] = 0;
+        }
+        if (!app_closing && garden != NULL && garden[drone.y] != NULL) {
+            garden[drone.y][drone.x] = 0;
+            InvalidateRect(FindWindow(szWindowClass, NULL), NULL, FALSE);
+        }
+
         InvalidateRect(FindWindow(szWindowClass, NULL), NULL, FALSE);
     }
     else {
@@ -359,24 +502,7 @@ void harvest() {
 void infoswitch(bool value) {
     info = value;
 
-    if (g_hWnd != NULL) {
-        RECT rect;
-        GetWindowRect(g_hWnd, &rect);
-
-        int newWidth;
-        if (info) {
-            newWidth = (widthgarden + 6) * widthbed + 16;
-        }
-        else {
-            newWidth = widthgarden * widthbed + 16;
-        }
-
-        SetWindowPos(g_hWnd, NULL, rect.left, rect.top,
-            newWidth, rect.bottom - rect.top,
-            SWP_NOMOVE | SWP_NOZORDER);
-
-        InvalidateRect(g_hWnd, NULL, TRUE);
-    }
+    update_window_size();
 }
 
 void seedswitch(bool value){
@@ -386,6 +512,7 @@ void seedswitch(bool value){
 void shopswitch(bool value) {
     shop = value;
 }
+
 
 void set_seed(CellType seed) {
     if (seeds) {
@@ -400,21 +527,46 @@ void set_seed(CellType seed) {
         MessageBox(NULL, L"Не могу выбрать семена - функция не доступна!", L"Предупреждение", MB_OK | MB_ICONWARNING);
     }
 }
+void set_seed(int seed) {
+    switch (seed) {
+    case 1:
+        set_seed(wheat);
+        break;
+    case 2:
+        set_seed(carrot);
+        break;
+    case 3:
+        set_seed(pumpkin);
+        break;
+    case 4:
+        set_seed(corn);
+        break;
+    default:
+        set_seed(empty);
+        break;
+    }
+}
 
 CellType whattype() {
-    if (garden[drone.y][drone.x] == 0) {
+    return whattype(drone.y, drone.x);
+}
+CellType whattype(int y, int x) {
+    if (garden == NULL) {
         return empty;
     }
-    else if (garden[drone.y][drone.x] == 1) {
+    if (garden[y][x] == 0) {
+        return empty;
+    }
+    else if (garden[y][x] == 1) {
         return wheat;
     }
-    else if (garden[drone.y][drone.x] == 2) {
+    else if (garden[y][x] == 2) {
         return carrot;
     }
-    else if (garden[drone.y][drone.x] == 3) {
+    else if (garden[y][x] == 3) {
         return pumpkin;
     }
-    else if (garden[drone.y][drone.x] == 4) {
+    else if (garden[y][x] == 4) {
         return corn;
     }
     else {
@@ -433,6 +585,7 @@ int getwidthofgarden() {
 void resetposition() {
     drone.y = 0;
     drone.x = 0;
+    InvalidateRect(g_hWnd, NULL, TRUE);
 }
 
 void wait(int milliseconds) {
@@ -478,16 +631,7 @@ void get_elapsed_time() {
     }
 }
 
-/*void set_speed(int speed) {
-    move_delay = 500 / speed;
-    if (move_delay < 30) move_delay = 30;
-    if (move_delay > 500) move_delay = 500;
-}*/
-
-void run_script() {
-    execute_script();
-}
-/*void loadgame() {
+void loadgame() {
     FILE* fin;
 
     fopen_s(&fin, "c:\\Windows\\Temp\\Garden.txt", "rt");
@@ -498,18 +642,21 @@ void run_script() {
 
     int savedWidth, savedHeight;
     fscanf_s(fin, "%d %d", &savedWidth, &savedHeight);
+    create_garden(savedHeight, savedWidth);
+    heightgarden = savedHeight;
+    widthgarden = savedWidth;
 
-    if (savedWidth == widthgarden && savedHeight == heightgarden) {
-        for (int i = 0; i < heightgarden; i++) {
-            for (int j = 0; j < widthgarden; j++) {
-                fscanf_s(fin, "%d", &garden[i][j]);
-            }
+    for (int i = 0; i < heightgarden; i++) {
+        for (int j = 0; j < widthgarden; j++) {
+            fscanf_s(fin, "%d", &garden[i][j]);
         }
     }
     fclose(fin);
 
     gardenfill = true;
-}*/
+    resetposition();
+    update_window_size();
+}
 
 void savegame() {
     FILE* fout;
@@ -520,10 +667,16 @@ void savegame() {
         return;
     }
     fprintf(fout, "%d %d\n", widthgarden, heightgarden);
+    int slot = 0;
 
     for (int i = 0; i < heightgarden; i++) {
         for (int j = 0; j < widthgarden; j++) {
-            fprintf(fout, "%d ", garden[i][j]);
+            if (garden[i][j] >= 10) {
+                fprintf(fout, "%d ", plantings[slot].result);
+                slot++;
+            }
+            else fprintf(fout, "%d ", garden[i][j]);
+
         }
         fprintf(fout, "\n");
     }
@@ -605,7 +758,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             plantings[i].active = false;
             plantings[i].total_grow_time = GROW_TIME;
         }
-
+        create_garden(heightgarden, widthgarden);
         if (!gardenfill) {
             fillgarden();
         }
@@ -646,6 +799,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     break;
     case WM_PAINT:
     {
+        if (garden == NULL) break;
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
 
@@ -899,7 +1053,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.1, buffer, strlen(buffer));
             sprintf(buffer, "Ваши Баллы: %d", score);
             TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.3, buffer, strlen(buffer));
-            sprintf(buffer, "Конечное значение таймера: %d", timer_value);
+            int seconds = timer_value / 1000;
+            int milliseconds = timer_value % 1000;
+            int minutes = seconds / 60;
+            seconds = seconds % 60;
+            sprintf(buffer, "Конечное значение таймера: %02d:%02d.%03d (%d мс)",
+                minutes, seconds, milliseconds, timer_value);
             TextOutA(hdc, (widthgarden + 1) * widthbed, heightbed * 0.5, buffer, strlen(buffer));
             if (seeds) {
                 sprintf(buffer, "Ваши выбранные семена:");
@@ -917,6 +1076,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         app_closing = true;
         savegame();
+        free_garden(heightgarden);
 
         Sleep(100);
 
